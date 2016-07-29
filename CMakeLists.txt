@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   ait_ros_messages
   sensor_msgs
   roscpp
-# cv_bridge
+  cv_bridge
 )
 find_package(OpenCV REQUIRED)
 
@@ -105,7 +105,7 @@ find_package(OpenCV REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES duo_avoidance
- CATKIN_DEPENDS ait_ros_messages sensor_msgs roscpp #cv_bridge
+ CATKIN_DEPENDS ait_ros_messages sensor_msgs roscpp cv_bridge
  # DEPENDS system_lib
 )
 
