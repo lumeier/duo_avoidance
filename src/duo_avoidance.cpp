@@ -18,7 +18,7 @@ DuoAvoidance::DuoAvoidance() : nh_("~") {
 void DuoAvoidance::duoMessageCb(const ait_ros_messages::VioSensorMsg::ConstPtr &msg) {
 
 ait_ros_messages::VioSensorMsg duo_msg_  = *msg;
-printf("Received message from Duo3d-Cam. Timestamp: %d,%d\n",duo_msg_.header.stamp.sec,duo_msg_.header.stamp.usec);
+printf("Received message from Duo3d-Cam. Timestamp: %d,%d\n",duo_msg_.header.stamp.sec,duo_msg_.header.stamp.nsec);
 
 
   // sensor_msgs::Image left = *msg;
