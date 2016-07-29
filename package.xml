@@ -1,0 +1,19 @@
+<package>
+  <name>duo_avoidance</name>
+  <version>0.0.0</version>
+  <description>
+	Potential Field based obstacle avoidance with Duo3d Cam on Bebop
+  </description>
+  <maintainer email="lumeier@student.ethz.ch">Lukas Meier</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>ait_ros_messages</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+
+  <run_depend>ait_ros_messages</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+</package>

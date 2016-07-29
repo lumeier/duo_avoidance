@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="duo_avoidance" type="duo_avoidance_node" name="duo_avoidance" output="screen">
+    <!--<remap to="/iris/camera1/image_raw" from="/vio_bridge/left_image"/>
+    <remap to="/mavros/imu/data_raw" from="/vio_bridge/imu"/>-->
+  </node>
+</launch>
