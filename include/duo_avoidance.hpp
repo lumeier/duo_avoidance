@@ -19,9 +19,11 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 
+
 #include <ros/ros.h>
 
 #include <stdio.h>
+#include <string.h>
 
 namespace duo_avoidance {
 
@@ -46,6 +48,6 @@ private:
 
 };
 
-} // namespace vio_bridge
+} // namespace duo_avoidance
 
 #endif

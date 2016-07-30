@@ -1,7 +1,7 @@
 /**
- *  vio_bridge.cpp
- *  author: Simone Guscetti <simonegu@student.ethz.ch>
- *  simple bridge class for DUO VIO
+ *  duo_avoidance.cpp
+ *  author: Lukas Meier <lukasdanmeier@gmail.com>
+ *  Collison Avoidance for Parrot Bebop with Duo3d Caml
  */
 
 #include "duo_avoidance.hpp"
@@ -24,20 +24,50 @@ printf("Received message from Duo3d-Cam. Timestamp: %d.%d\n",duo_msg_.header.sta
 cv::Mat img_l_=cv_bridge::toCvCopy(duo_msg_.left_image,"mono8")->image;
 cv::Mat img_r_=cv_bridge::toCvCopy(duo_msg_.right_image,"mono8")->image;
 
-cv_bridge::CvImage cv_out;
-cv_out.image=img_l_;
-cv_out.encoding="mono8";
+// //Debug: Republish left image
+// cv_bridge::CvImage cv_out;
+// cv_out.image=img_r_;
+// cv_out.encoding="mono8";
+// cv_out.toImageMsg(test_output_);
+// test_pub_.publish(test_output_);
 
-cv_out.toImageMsg(test_output_);
-test_pub_.publish(test_output_);
+//Calculate Disparity image in Opencv (camera Calibration has to be done, to get good results!!!!!!!)
 
-//Republish left image
+int max_disp=500;
+int wsize=21;
+cv::Mat left_disp;
+cv::Mat right_disp;
+cv::Mat left;
+cv::Mat right;
+left  = img_l_.clone();
+right = img_r_.clone();
+
+printf("Opencv Version: %s\n",CV_VERSION);
+cv::StereoBM *left_matcher=cv::StereoBM::create(max_disp,wsize);
+left_matcher->setTextureThreshold(10);
+left_matcher->setUniquenessRatio(3);
 
 
-  // sensor_msgs::Image left = *msg;
-  // vio_msg_.header = left.header;
-  // vio_msg_.left_image = left;
-  // vio_pub_.publish(vio_msg_);
+printf("Object created!!!\n");
+left_matcher-> compute(left, right,left_disp);
+printf("Disparity Calculated!!\n");
+
+
+
+
+
+// cuda::Ptr<StereoBM> left_matcher = cuda::StereoBM::create(max_disp,wsize);
+// cv::Ptr<DisparityWLSFilter> wls_filter;
+// wls_filter = cv::createDisparityWLSFilter(left_matcher);
+// cv::Ptr<StereoMatcher> right_matcher = cv::createRightMatcher(left_matcher);
+//
+// //matching_time = (double)getTickCount();
+// left_matcher-> compute(img_l_, img_r_, left_disp);
+// right_matcher->compute(img_r_, img_l_, right_disp);
+//matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+
+
+
 }
 
-} // namespace vio_bridge
+} // namespace duo_avoidance
