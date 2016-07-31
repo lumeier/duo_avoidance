@@ -35,14 +35,16 @@ private:
 
   ros::NodeHandle nh_;
   ros::Subscriber duo_message_sub_;
-  ros::Publisher test_pub_;
+  ros::Publisher test_pub1_;
+  ros::Publisher test_pub2_;
   cv::Mat img_l_;
   cv::Mat img_r_;
 
 //  ros::Publisher vio_pub_;
 //  std::vector<sensor_msgs::Imu> imu_;
   ait_ros_messages::VioSensorMsg duo_msg_;
-  sensor_msgs::Image test_output_;
+  sensor_msgs::Image test_output1_;
+  sensor_msgs::Image test_output2_;
 
   void duoMessageCb(const ait_ros_messages::VioSensorMsg::ConstPtr &msg);
 
