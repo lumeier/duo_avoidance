@@ -9,6 +9,7 @@
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <stereo_msgs/DisparityImage.h>
 #include <ait_ros_messages/VioSensorMsg.h>
 #include <vector>
 
@@ -34,19 +35,26 @@ public:
 private:
 
   ros::NodeHandle nh_;
-  ros::Subscriber duo_message_sub_;
+  ros::Subscriber disparity_message_sub_;
   ros::Publisher test_pub1_;
   ros::Publisher test_pub2_;
-  cv::Mat img_l_;
-  cv::Mat img_r_;
+  cv::Mat disparity_img_;
+  cv::Mat depth_img_;
+  cv::Size size_cropped_;
+  cv::Mat binned_img_;
+float focal_length_;
+float baseline_;
+float command_x_;
+float command_y_;
 
 //  ros::Publisher vio_pub_;
 //  std::vector<sensor_msgs::Imu> imu_;
-  ait_ros_messages::VioSensorMsg duo_msg_;
+//  ait_ros_messages::VioSensorMsg duo_msg_;
+  sensor_msgs::Image disparity_msg_;
   sensor_msgs::Image test_output1_;
   sensor_msgs::Image test_output2_;
 
-  void duoMessageCb(const ait_ros_messages::VioSensorMsg::ConstPtr &msg);
+  void disparityMessageCb(const stereo_msgs::DisparityImage::ConstPtr &msg);
 
 };
 

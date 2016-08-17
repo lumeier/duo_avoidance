@@ -9,149 +9,118 @@
 namespace duo_avoidance {
 
 DuoAvoidance::DuoAvoidance() : nh_("~") {
-  duo_message_sub_ = nh_.subscribe<ait_ros_messages::VioSensorMsg>(
-      "/vio_sensor", 2, &DuoAvoidance::duoMessageCb, this);
+  disparity_message_sub_ = nh_.subscribe<stereo_msgs::DisparityImage>(
+      "/duo3d_camera/disparity", 2, &DuoAvoidance::disparityMessageCb, this);
 
   test_pub1_ = nh_.advertise<sensor_msgs::Image>("/test_left_image", 1);
   test_pub2_ = nh_.advertise<sensor_msgs::Image>("/test_right_image", 1);
+  printf("Started sending!!\n");
 }
 
-void DuoAvoidance::duoMessageCb(const ait_ros_messages::VioSensorMsg::ConstPtr &msg) {
+void DuoAvoidance::disparityMessageCb(const stereo_msgs::DisparityImage::ConstPtr &msg) {
 
-ait_ros_messages::VioSensorMsg duo_msg_  = *msg;
-printf("Received message from Duo3d-Cam. Timestamp: %d.%d\n",duo_msg_.header.stamp.sec,duo_msg_.header.stamp.nsec);
+stereo_msgs::DisparityImage disparity_msg_  = *msg;
+//printf("Received message from Duo3d-Cam. Timestamp: %d.%d\n",disparity_msg_.header.stamp.sec,duo_msg_.header.stamp.nsec);
 
 //Use cv_bridge to transform images to cv::Mat
-cv::Mat img_l_=cv_bridge::toCvCopy(duo_msg_.left_image,"mono8")->image;
-cv::Mat img_r_=cv_bridge::toCvCopy(duo_msg_.right_image,"mono8")->image;
+cv::Mat disparity_img_=cv_bridge::toCvCopy(disparity_msg_.image,"32FC1")->image;
+focal_length_=disparity_msg_.f;
+baseline_=disparity_msg_.T;
+
+//Crop image to square to remove black boarder from block matching
+cv::Rect ROI(43,20,234,201);
+disparity_img_=disparity_img_(ROI);
+cv::Size size_cropped_ =disparity_img_.size();
+
+//cv::Scalar mean_value = cv::mean(disparity_img_);
+//cv::Mat mean_img(mean_value);
+//printf("mean value: %f\n",mean_value[0]);
+
+//calculate depth
+
+//binning
+int n_bins_x=6;
+int n_bins_y=3;
+
+int bin_start_x=0;
+int bin_start_y=0;
+int avg_count=0;
+float avg_cumsum=0;
+int bin_size_x=size_cropped_.width/n_bins_x;
+int bin_size_y=size_cropped_.height/n_bins_y;
+float pix_val=0;
+float mean_val=0;
+//printf("binx %d biny: %d\n",bin_size_x,bin_size_y);
+cv::Mat bin_img(n_bins_y,n_bins_x,CV_32FC1);
 
 
-cv::Mat left_disp;
-cv::Mat right_disp;
-cv::Mat left;
-cv::Mat right;
-left  = img_l_.clone();
-right = img_r_.clone();
-cv::Size img_size =img_l_.size();
+for (int bin_x=0;bin_x<n_bins_x;bin_x++)
+{	 
+ for(int bin_y=0;bin_y<n_bins_y;bin_y++)
+   {
 
-//Camera Calibration Parameters of left Camera
-cv::Mat distortion_cam1(1,5,CV_64FC1,cvScalar(0.));
-distortion_cam1.at<double>(0,0)=-0.4186;
-distortion_cam1.at<double>(0,1)=0.2771;
-distortion_cam1.at<double>(0,4)=-0.1375;
+	avg_count=0;
+	avg_cumsum=0;
+	for(int i_x=0;i_x<bin_size_x;i_x++)
+	{
+	for(int i_y=0;i_y<bin_size_y;i_y++)
+	{	//printf("i_x: %d i_y: %d\n",i_x,i_y);
+		pix_val=disparity_img_.at<float>(bin_y*bin_size_y+i_y,bin_x*bin_size_x+i_x);
+		//pix_val=disparity_img_.at<float>(50,50);
+		//pix_val=5;		
+		if(pix_val>-0.5)
+		{
+		//printf("i_x: %d i_y: %d\n",i_x,i_y);
+		avg_count++;
+		avg_cumsum=avg_cumsum+pix_val;
+		}
+	}
+	}
 
-cv::Mat intrinsics_cam1(3,3,CV_64FC1,cvScalar(0.));
-intrinsics_cam1.at<double>(0,0)=269.181725;	//fx Focal Length
-intrinsics_cam1.at<double>(1,1)=269.9321;	//fy Focal Length
-intrinsics_cam1.at<double>(0,2)=156.3816;	//x0 Principal Point
-intrinsics_cam1.at<double>(1,2)=113.9369;	//y0 Principal Point
-intrinsics_cam1.at<double>(2,2)=1.;
+	if(avg_count>0){	
+	mean_val=avg_cumsum/(avg_count*1.0);
+	bin_img.at<float>(bin_y,bin_x)=focal_length_*baseline_/mean_val;
+	}
+    }
+}
 
-//Camera calibration parameters of right Camera
-cv::Mat distortion_cam2(1,5,CV_64FC1,cvScalar(0.));
-distortion_cam2.at<double>(0,0)=-0.4233;
-distortion_cam2.at<double>(0,1)=0.2967;
-distortion_cam2.at<double>(0,4)=-0.1663;
+float x_command_sum=0;
 
-cv::Mat intrinsics_cam2(3,3,CV_64FC1,cvScalar(0.));
-intrinsics_cam2.at<double>(0,0)=270.1185;	//fx Focal Length
-intrinsics_cam2.at<double>(1,1)=270.7983;	//fy Focal Length
-intrinsics_cam2.at<double>(0,2)=163.4106;	//x0 Principal Point
-intrinsics_cam2.at<double>(1,2)=120.1803;	//y0 Principal Point
-intrinsics_cam2.at<double>(2,2)=1.;
+for (int i=1;i<n_bins_x-1;i++)
+{
+x_command_sum=x_command_sum+bin_img.at<float>(1,i);
+}
+command_x_=2-(1./(n_bins_x-2)*x_command_sum);
 
-//Rotation Matrix R_lr
-cv::Mat R_lr(3,3,CV_64FC1,cvScalar(0.));
-R_lr.at<double>(0,0)=1.;	R_lr.at<double>(0,1)=0.0018258;	R_lr.at<double>(0,2)=0.0028920;
-R_lr.at<double>(1,0)=-0.0018415;R_lr.at<double>(1,1)=1.;	R_lr.at<double>(1,2)=0.005452;
-R_lr.at<double>(2,0)=0.0028820;	R_lr.at<double>(2,1)=-0.0054579;R_lr.at<double>(2,2)=1.;
+if (command_x_>1.1)
+	command_x_=1.1;
+else if (command_x_<0)
+	command_x_=0;
 
-//Translation r_lr
-cv::Mat r_lr(3,1,CV_64FC1,cvScalar(0.));
-r_lr.at<double>(0,0)=30.5341;
-r_lr.at<double>(1,0)=-0.2507;
-r_lr.at<double>(2,0)=-1.6489;
-
+command_y_=2-(bin_img.at<float>(1,0)+bin_img.at<float>(1,1)-bin_img.at<float>(1,4)-bin_img.at<float>(1,5))/5.;
 
 
-//Define StereoRectify Outputs
-cv::Mat R1(3,3,CV_64FC1,cvScalar(0.));
-cv::Mat R2(3,3,CV_64FC1,cvScalar(0.));
-cv::Mat P1(3,4,CV_64FC1,cvScalar(0.));
-cv::Mat P2(3,4,CV_64FC1,cvScalar(0.));
-cv::Mat Q(4,4,CV_64FC1,cvScalar(0.));
 
-cv::Rect validRoi[2];
-
-//Calculate the Stereo Rectification
-cv::stereoRectify(	intrinsics_cam1,distortion_cam1,
-			intrinsics_cam2,distortion_cam2,
-			img_size, R_lr.inv(), r_lr, R1, R2, P1, P2, Q,
-			cv::CALIB_ZERO_DISPARITY, 1, img_size, &validRoi[0], &validRoi[1]);
-
-//Prepare remapping & remap (undistort)
-cv::Mat rmap[2][2];
-cv::initUndistortRectifyMap(intrinsics_cam1, distortion_cam1, R1, P1, img_size, CV_16SC2, rmap[0][0], rmap[0][1]);
-cv::initUndistortRectifyMap(intrinsics_cam2, distortion_cam2, R2, P2, img_size, CV_16SC2, rmap[1][0], rmap[1][1]);
-
-remap(img_l_,left,rmap[0][0],rmap[0][1],cv::INTER_LINEAR);
-remap(img_r_,right,rmap[1][0],rmap[1][1],cv::INTER_LINEAR);
-
-//crop_img to be rectangular again and resize to initial size
-cv::Mat cropped_left=left(validRoi[0]);
-cv::Mat cropped_right=right(validRoi[1]);
-cv::Mat resized_left;
-cv::Mat resized_right;
-cv::resize(cropped_left,resized_left,img_size,0,0,cv::INTER_AREA);
-cv::resize(cropped_right,resized_right,img_size,0,0,cv::INTER_AREA);
-
-
-//append Image on left side to not get cropped result
-cv::Mat img_l_app(img_size.height,img_size.width+90,0,cvScalar(0.));
-cv::Mat img_r_app(img_size.height,img_size.width+90,0,cvScalar(0.));
-img_l_.copyTo(img_l_app(cv::Rect(90,0,img_l_.cols,img_l_.rows)));
-img_r_.copyTo(img_r_app(cv::Rect(90,0,img_r_.cols,img_r_.rows)));
-
-//Calculate disparity
-int max_disp=64;
-int wsize=25;
-cv::StereoBM sbm(cv::StereoBM::BASIC_PRESET,max_disp,wsize);
-sbm(resized_left,resized_right,left_disp,CV_16S);
-sbm(img_l_app,img_r_app,left_disp,CV_16S);
-left_disp=left_disp(cv::Rect(90,0,img_r_.cols,img_r_.rows));
-
-//Alternatively calculation with stereSGBM (Semi Global Block Matching) but 10x more expensive
-//cv::StereoSGBM sbm;
-//sbm.SADWindowSize = 15;
-//sbm.numberOfDisparities = 64;
-//sbm.preFilterCap = 63;
-//sbm.minDisparity = -2;
-//sbm.uniquenessRatio= 30;
-//sbm.speckleWindowSize = 100;
-//sbm.speckleRange = 32;
-//sbm.disp12MaxDiff =1;
-//sbm.fullDP=false;
-//sbm.P1=100;
-//sbm.P2=200;
-//sbm(resized_left,resized_right,left_disp);
+printf("command x: %f command y: %f depth: %f m\n",command_x_,command_y_,bin_img.at<float>(1,3));
+//cv::Size img_size =img_l_.size();
 
 
 //Convert to 8bit
-left_disp.convertTo(left_disp,0);
+//left_disp.convertTo(left_disp,0);
 
 
 // //Debug: Republish left image
  cv_bridge::CvImage cv_out1;
- cv_out1.image=img_l_app;
- cv_out1.encoding="mono8";
+ cv_out1.image=disparity_img_;
+ cv_out1.encoding="32FC1";
  cv_out1.toImageMsg(test_output1_);
  test_pub1_.publish(test_output1_);
 
  cv_bridge::CvImage cv_out2;
- cv_out2.image=left_disp;
- cv_out2.encoding="mono8";
+ cv_out2.image=bin_img;
+ cv_out2.encoding="32FC1";
  cv_out2.toImageMsg(test_output2_);
- test_pub2_.publish(test_output2_);
+test_pub2_.publish(test_output2_);
 
 }
 
