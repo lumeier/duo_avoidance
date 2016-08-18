@@ -11,6 +11,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <stereo_msgs/DisparityImage.h>
 #include <ait_ros_messages/VioSensorMsg.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <vector>
 
 #include <cv_bridge/cv_bridge.h>
@@ -38,6 +39,7 @@ private:
   ros::Subscriber disparity_message_sub_;
   ros::Publisher test_pub1_;
   ros::Publisher test_pub2_;
+  ros::Publisher avoidance_cmd_pub_;
   cv::Mat disparity_img_;
   cv::Mat depth_img_;
   cv::Size size_cropped_;

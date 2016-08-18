@@ -14,6 +14,7 @@ DuoAvoidance::DuoAvoidance() : nh_("~") {
 
   test_pub1_ = nh_.advertise<sensor_msgs::Image>("/test_left_image", 1);
   test_pub2_ = nh_.advertise<sensor_msgs::Image>("/test_right_image", 1);
+  avoidance_cmd_pub_= nh_.advertise<std_msgs::Float32MultiArray>("/avoidance/cmd",1);
   printf("Started sending!!\n");
 }
 
@@ -85,6 +86,7 @@ for (int bin_x=0;bin_x<n_bins_x;bin_x++)
 }
 
 float x_command_sum=0;
+float y_command_sum=0;
 
 for (int i=1;i<n_bins_x-1;i++)
 {
@@ -93,12 +95,45 @@ x_command_sum=x_command_sum+bin_img.at<float>(1,i);
 command_x_=2-(1./(n_bins_x-2)*x_command_sum);
 
 if (command_x_>1.1)
-	command_x_=1.1;
+	{command_x_=1.1;}
 else if (command_x_<0)
-	command_x_=0;
+	{command_x_=0;}
 
-command_y_=2-(bin_img.at<float>(1,0)+bin_img.at<float>(1,1)-bin_img.at<float>(1,4)-bin_img.at<float>(1,5))/5.;
+float y_upper_thr=1.5;
+float y_lower_thr=0.5;
+for (int i=0;i<n_bins_x;i++)
+	{
+	if (bin_img.at<float>(1,i)>y_upper_thr)
+		bin_img.at<float>(1,i)=y_upper_thr;
+	else if (bin_img.at<float>(1,0)<y_lower_thr)
+		bin_img.at<float>(1,0)=y_lower_thr;
+	}
 
+y_command_sum=((y_upper_thr-bin_img.at<float>(1,0))+(y_upper_thr-bin_img.at<float>(1,1))-(y_upper_thr-bin_img.at<float>(1,4))-(y_upper_thr-bin_img.at<float>(1,5)))/2.;
+//if (y_command_sum>=0)
+//	{command_y_=2-y_command_sum;
+//	if (command_y_>1)
+//	command_y_=1;
+//	else if (command_x_<0)
+//}//	command_y_=0;}
+//else if (y_command_sum<0)
+//	{command_y_=-2+y_command_sum;
+//	if (command_y_<-1)
+//	command_y_=-1;
+//	else if (command_x_>0)
+//}//	command_y_=0;}
+command_y_=y_command_sum;
+
+if (command_y_<-1)
+	{command_y_=-1;}
+else if (command_y_>1)
+	{command_y_=1;}
+
+std_msgs::Float32MultiArray cmd;
+cmd.data.clear();
+cmd.data.push_back(command_x_);
+cmd.data.push_back(command_y_);
+avoidance_cmd_pub_.publish(cmd);
 
 
 printf("command x: %f command y: %f depth: %f m\n",command_x_,command_y_,bin_img.at<float>(1,3));
